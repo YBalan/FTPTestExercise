@@ -10,36 +10,35 @@ using System.Threading.Tasks;
 
 namespace FTP
 {
-    public sealed class FTPDownloader
-    {
-        public delegate void ProgressDelegate(int progress, TimeSpan estimateTimeLeft, long bytesDownloaded, long fileSize);
-        public event ProgressDelegate FtpDownloadingProgress;
-        public event EventHandler<long> FtpDownloadingFileSize;
-        public bool IsStarted { get; private set; }
+    public sealed class FTPDownloader : IDownloader
+    {        
+        public event ProgressDelegate DownloadingProgress;
+        public event EventHandler<long> DownloadingFileSize;
+        public bool IsStarted { get; private set; }        
 
         public async void SaveToFile(string path, IEnumerable<byte> content)
         {
             await Task.Run(() => File.WriteAllBytes(path, content.ToArray()));
         }
 
-        public IEnumerable<byte> Download(string ftpLink)
-        {
-            if (string.IsNullOrWhiteSpace(ftpLink)) throw new ArgumentNullException(nameof(ftpLink));
+        public IEnumerable<byte> Download(string uri)
+        {   
+            if (string.IsNullOrWhiteSpace(uri)) throw new ArgumentNullException(nameof(uri));
 
             IsStarted = true;
 
             var credentials = new NetworkCredential("anonymous", "");
 
-            var sizeRequest = WebRequest.Create(ftpLink);
+            var sizeRequest = WebRequest.Create(uri);
 
             sizeRequest.Credentials = credentials;
             sizeRequest.Method = WebRequestMethods.Ftp.GetFileSize;
             var fileSize = sizeRequest.GetResponse().ContentLength;
 
-            FtpDownloadingFileSize?.Invoke(this, fileSize);
+            DownloadingFileSize?.Invoke(this, fileSize);
 
 
-            var request = (FtpWebRequest)WebRequest.Create(ftpLink);
+            var request = (FtpWebRequest)WebRequest.Create(uri);
 
             request.KeepAlive = true;
             request.UsePassive = true;
@@ -75,7 +74,7 @@ namespace FTP
 
                     var progress = (bytesReceived / (double)fileSize) * 100.0;
 
-                    FtpDownloadingProgress?.Invoke((int)progress, timeToDownload, bytesReceived, fileSize);
+                    DownloadingProgress?.Invoke((int)progress, timeToDownload, bytesReceived, fileSize);
 
                     for (int i = 0; i < read; i++)
                     {
